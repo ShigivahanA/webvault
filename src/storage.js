@@ -1,4 +1,4 @@
-import { encryptData, decryptData } from "./encrypt.js";
+import { encryptData, decryptData, DEFAULT_SECRET } from "./encrypt.js";
 
 let nodeStorageInstance = null;
 
@@ -13,7 +13,7 @@ async function getNodeStorage() {
 export default class WebVault {
   constructor(namespace, storageInstance, secret) {
     this.namespace = namespace;
-    this.secret = secret;
+    this.secret = secret || DEFAULT_SECRET;
     this.storage = storageInstance;
   }
 
@@ -33,8 +33,12 @@ export default class WebVault {
     return `${this.namespace}:${key}`;
   }
 
-  set(key, value, ttl = null) {
-    const data = { value, expiry: ttl ? Date.now() + ttl : null };
+  set(key, value, ttl = null, ttlUnit = "ms") {
+    let expiry = null;
+    if (ttl) {
+      expiry = ttlUnit === "s" ? Date.now() + ttl * 1000 : Date.now() + ttl;
+    }
+    const data = { value, expiry };
     const toStore = this.secret
       ? encryptData(data, this.secret)
       : JSON.stringify(data);
@@ -48,7 +52,9 @@ export default class WebVault {
     let data;
     try {
       data = this.secret ? decryptData(raw, this.secret) : JSON.parse(raw);
+      if (!data) throw new Error("Failed to parse/decrypt");
     } catch {
+      console.warn(`[WebVault] Failed to decrypt or parse data for key: ${key}`);
       return null;
     }
 
@@ -65,7 +71,13 @@ export default class WebVault {
   }
 
   clear() {
-    Object.keys(this.storage)
+    let keys;
+    if (typeof window !== "undefined") {
+      keys = Object.keys(this.storage);
+    } else {
+      keys = this.storage._keys || [];
+    }
+    keys
       .filter((k) => k.startsWith(this.namespace + ":"))
       .forEach((k) => this.storage.removeItem(k));
   }

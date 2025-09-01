@@ -1,6 +1,6 @@
 import CryptoJS from "crypto-js";
 
-const DEFAULT_SECRET = "webvault-secret";
+export const DEFAULT_SECRET = "webvault-secret";
 
 export function encryptData(data, secret = DEFAULT_SECRET) {
   return CryptoJS.AES.encrypt(JSON.stringify(data), secret).toString();
